@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apple Fitness 600-Point Helper (v7)</title>
+<style>
+  :root { --gap: 12px; --pad: 14px; --radius: 12px; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         margin: 0; background: #0f1115; color: #eaeef6; }
+  header { padding: 20px var(--pad); text-align: center; background: #151a22; border-bottom: 1px solid #202634; }
+  h1 { font-size: 1.25rem; margin: 0 0 6px; }
+  p.sub { margin: 0; color: #aab6d3; font-size: 0.95rem; }
+  main { padding: 16px; max-width: 960px; margin: 0 auto; display: grid; gap: var(--gap); }
+  .card { background: #151a22; border: 1px solid #242b3b; border-radius: var(--radius); padding: var(--pad); }
+  .row { display: grid; gap: var(--gap); }
+  @media (min-width: 760px) {
+    .row { grid-template-columns: 1fr 1fr; }
+  }
+  .grid-3 { display: grid; gap: var(--gap); grid-template-columns: repeat(3, minmax(0,1fr)); }
+  label { display: block; font-size: 0.9rem; color: #bcd; margin-bottom: 6px; }
+  input[type="number"] { width: 100%; border-radius: 10px; border: 1px solid #2c3344; background: #0d1017; color: #eaeef6;
+                         padding: 10px 12px; font-size: 1.05rem; }
+  .muted { color: #9fb0cf; font-size: 0.9rem; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid #2b3346; background: #0b0f16; color: #cde; font-size: 0.85rem; }
+  .kpi { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0,1fr)); margin-top: 10px; }
+  .kpi .item { background: #0c111a; border: 1px solid #273147; border-radius: 10px; padding: 10px; text-align: center; }
+  .kpi .label { color: #9fb0cf; font-size: 0.85rem; }
+  .kpi .val { font-weight: 700; font-size: 1.2rem; }
+  .total { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #0b1018;
+           border: 1px solid #293349; border-radius: 12px; padding: 12px; margin-top: 10px; }
+  .tag { font-weight: 700; padding: 6px 10px; border-radius: 999px; }
+  .ok { background: #0e3d1f; color: #c9ffd9; border: 1px solid #1f6f3a; }
+  .bad { background: #3d0e0e; color: #ffd1d1; border: 1px solid #6f1f1f; }
+  button { background: #1b2333; color: #eaf1ff; padding: 10px 14px; border: 1px solid #2a3347; border-radius: 10px; cursor: pointer; font-weight: 600; }
+  button:hover { filter: brightness(1.1); }
+  .status { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; border:1px solid #2a3347; background:#0b1018; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#6b7280; }
+  .dot.on { background:#10b981; }
+  .scenario { display:grid; grid-template-columns: 1fr; gap:10px; }
+  .scard { background:#0c111a; border:1px solid #273147; border-radius:12px; padding:12px; }
+  .title { font-weight:700; margin-bottom:6px; }
+  .line { display:flex; justify-content:space-between; gap:8px; }
+  .val { font-variant-numeric: tabular-nums; }
+  .warn { color:#f6c177; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Apple Fitness 600-Point Helper (v7)</h1>
+  <p class="sub">Always in Apple order: <strong>Move → Exercise → Stand</strong>. Rounded to whole points.</p>
+</header>
+<main>
+  <section class="status">
+    <div id="jsdot" class="dot"></div>
+    <div id="jstext">JavaScript <strong>inactive</strong>. Open in a browser to enable live calculations.</div>
+  </section>
+
+  <section class="row">
+    <div class="card">
+      <h2 style="margin-top:0">1) Goals</h2>
+      <div class="grid-3">
+        <div>
+          <label for="moveGoal">Move Goal (cal)</label>
+          <input id="moveGoal" type="number" min="1" value="500">
+        </div>
+        <div>
+          <label for="exGoal">Exercise Goal (min)</label>
+          <input id="exGoal" type="number" min="1" value="45">
+        </div>
+        <div>
+          <label for="standGoal">Stand Goal (hrs)</label>
+          <input id="standGoal" type="number" min="1" value="10">
+        </div>
+      </div>
+      <p class="muted" style="margin-top:10px">Points = ROUND((Move ÷ MoveGoal + Exercise ÷ ExerciseGoal + Stand ÷ StandGoal) × 100), capped at 600/day.</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">2) Today’s progress</h2>
+      <div class="grid-3">
+        <div>
+          <label for="move">Move (active cal)</label>
+          <input id="move" type="number" min="0" value="0">
+        </div>
+        <div>
+          <label for="ex">Exercise (min)</label>
+          <input id="ex" type="number" min="0" value="0" step="1">
+        </div>
+        <div>
+          <label for="stand">Stand (hrs)</label>
+          <input id="stand" type="number" min="0" max="24" value="0" step="1">
+        </div>
+      </div>
+
+      <div class="kpi">
+        <div class="item">
+          <div class="label">Move Points</div>
+          <div id="movePts" class="val">0</div>
+        </div>
+        <div class="item">
+          <div class="label">Exercise Points</div>
+          <div id="exPts" class="val">0</div>
+        </div>
+        <div class="item">
+          <div class="label">Stand Points</div>
+          <div id="standPts" class="val">0</div>
+        </div>
+      </div>
+
+      <div class="total">
+        <div class="out"><strong>Total:</strong> <span id="totalPts">0</span> / 600</div>
+        <div id="statusTag" class="tag bad">Short of 600</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="recalc">Recalculate now</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">3) Simple combos to reach 600</h2>
+    <p class="muted" style="margin:-6px 0 8px">Choose a mode, then use the short menu of practical mixes. Everything is rounded and capped properly.</p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <label><input type="radio" name="mode" id="modeTotals" checked> From scratch totals</label>
+      <label><input type="radio" name="mode" id="modeAdds"> Additions from current</label>
+      <button id="refreshCombos">Show combos</button>
+    </div>
+
+    <div id="scenarios" class="scenario" style="margin-top:10px;"></div>
+  </section>
+
+  <section class="muted" style="text-align:center;opacity:.8;">Built to be fully offline • Move → Exercise → Stand</section>
+</main>
+
+<script>
+  function q(id){return document.getElementById(id)}
+  function num(id, d=0){const v=parseFloat(q(id).value);return Number.isFinite(v)?v:d}
+  function clampStand(h){return Math.max(0, Math.min(24, h))}
+  const R = Math.round;
+
+  function goals(){return {m:num('moveGoal',500), e:num('exGoal',45), s:num('standGoal',10)}}
+  function vals(){return {m:num('move',0), e:num('ex',0), s:num('stand',0)}}
+
+  function calcPoints(m,e,s,g){
+    s = clampStand(s);
+    const mp = (m/Math.max(1,g.m))*100;
+    const ep = (e/Math.max(1,g.e))*100;
+    const sp = (s/Math.max(1,g.s))*100;
+    let total = mp+ep+sp;
+    if (total>600) total = 600;
+    return {mp,ep,sp,total};
+  }
+
+  function update(){
+    const g=goals(), v=vals();
+    const o=calcPoints(v.m,v.e,v.s,g);
+    q('movePts').textContent = R(o.mp);
+    q('exPts').textContent   = R(o.ep);
+    q('standPts').textContent= R(o.sp);
+    q('totalPts').textContent= R(o.total);
+    const tag=q('statusTag');
+    if(o.total>=600){tag.textContent='600 reached'; tag.className='tag ok'} else {tag.textContent='Short of 600'; tag.className='tag bad'}
+  }
+
+  function pctToUnit(pct, goal){ return (pct/100)*goal } // convert % of ring → raw unit
+
+  function buildCard(title, rows){
+    const card = document.createElement('div');
+    card.className = 'scard';
+    const h = document.createElement('div');
+    h.className = 'title';
+    h.textContent = title;
+    card.appendChild(h);
+    rows.forEach(r => {
+      const line = document.createElement('div'); line.className='line';
+      const left = document.createElement('div'); left.textContent = r[0];
+      const right = document.createElement('div'); right.className='val'; right.textContent = r[1];
+      line.appendChild(left); line.appendChild(right);
+      card.appendChild(line);
+    });
+    return card;
+  }
+
+  // Scenarios definition (percent splits)
+  const scenarios = [
+    { key:'all-move',   name:'All Move',        parts:[100,   0,   0] },
+    { key:'all-ex',     name:'All Exercise',    parts:[  0, 100,   0] },
+    { key:'all-stand',  name:'All Stand',       parts:[  0,   0, 100] }, // may be impossible if cap
+    { key:'move-ex',    name:'50/50 Move + Exercise', parts:[50,50,0] },
+    { key:'move-stand', name:'50/50 Move + Stand',    parts:[50,0,50] },
+    { key:'ex-stand',   name:'50/50 Exercise + Stand',parts:[0,50,50] },
+    { key:'thirds',     name:'One‑third each',        parts:[33.34,33.33,33.33] }
+  ];
+
+  function renderCombos(){
+    const g=goals(), v=vals();
+    const modeAdds = q('modeAdds').checked;
+    const container = q('scenarios');
+    container.innerHTML = '';
+
+    // How many points are needed?
+    const cur = calcPoints(v.m,v.e,v.s,g);
+    const needed = Math.max(0, 600 - cur.total); // could be 0
+
+    scenarios.forEach(sc => {
+      const mp = sc.parts[0]; const ep = sc.parts[1]; const sp = sc.parts[2];
+      // Distribute *points* according to parts
+      let movePts = (modeAdds ? needed : 600) * (mp/(mp+ep+sp || 1));
+      let exPts   = (modeAdds ? needed : 600) * (ep/(mp+ep+sp || 1));
+      let stPts   = (modeAdds ? needed : 600) * (sp/(mp+ep+sp || 1));
+
+      // Convert to raw units in Apple's order and round
+      let moveUnits = R(pctToUnit(movePts, g.m));
+      let exUnits   = R(pctToUnit(exPts, g.e));
+      let stUnits   = R(pctToUnit(stPts, g.s));
+
+      // If additions mode, add current values to show final totals
+      let title = sc.name + (modeAdds ? ' — Add this to your current totals' : ' — Aim for these totals');
+      let rows = [];
+
+      if(!modeAdds){
+        // From-scratch totals
+        // Stand cap check
+        const capWarn = stUnits > 24 ? ' (cap 24h!)' : '';
+        rows.push(['Move (cal)', String(moveUnits)]);
+        rows.push(['Exercise (min)', String(exUnits)]);
+        rows.push(['Stand (h)', (stUnits>24? 'N/A' : String(stUnits)) + (stUnits>24? ' (cap 24h)' : '') ]);
+      } else {
+        // Additions from current
+        const addMove = moveUnits, addEx = exUnits, addStand = stUnits;
+        const finalStand = R(clampStand(v.s + addStand));
+        rows.push(['+Move (cal)', String(addMove)]);
+        rows.push(['+Exercise (min)', String(addEx)]);
+        rows.push(['+Stand (h)', (v.s + addStand>24? 'N/A' : String(addStand)) + (v.s + addStand>24? ' (cap 24h)' : '') ]);
+      }
+
+      // Card and attach
+      const card = buildCard(title, rows);
+      // Add small computed info line
+      const info = document.createElement('div');
+      info.className = 'muted';
+      const totalPts = modeAdds ? Math.min(600, Math.round(cur.total + movePts + exPts + stPts)) : 600;
+      info.textContent = 'Approx points distribution → Move ' + R(movePts) + ' • Exercise ' + R(exPts) + ' • Stand ' + R(stPts) + ' | Final Total ≈ ' + totalPts;
+      card.appendChild(info);
+
+      // If scenario impossible (stand cap), gray note
+      if((!modeAdds && stUnits>24) || (modeAdds && (v.s + stUnits)>24)){
+        const w = document.createElement('div'); w.className='warn';
+        w.textContent = 'Note: This scenario exceeds the 24‑hour Stand cap. Try Move/Exercise instead.';
+        card.appendChild(w);
+      }
+      container.appendChild(card);
+    });
+  }
+
+  function arm(){
+    ['moveGoal','exGoal','standGoal','move','ex','stand'].forEach(id=>{
+      ['input','change','keyup','blur'].forEach(ev=>q(id).addEventListener(ev, update))
+    });
+    q('recalc').addEventListener('click', update);
+    q('refreshCombos').addEventListener('click', renderCombos);
+    q('modeTotals').addEventListener('change', renderCombos);
+    q('modeAdds').addEventListener('change', renderCombos);
+    q('jsdot').classList.add('on');
+    q('jstext').innerHTML='JavaScript <strong>active</strong>. Live calculations enabled.'
+    update();
+    renderCombos();
+  }
+  document.addEventListener('DOMContentLoaded', arm);
+</script>
+</body>
+</html>
